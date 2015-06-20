@@ -14,6 +14,9 @@
 u_char PC_MAC[] = {0x3c, 0x97, 0x0e, 0xa6, 0x62, 0x61};
 u_char ROUTER_MAC[] = {0x44, 0x94, 0xfc, 0x82, 0xd2, 0x93};
 
+pcap_t * lan_device;
+pcap_t * wan_device;
+
 void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
     int * id = (int *)arg;
@@ -30,18 +33,14 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     if (!memcmp(packet + OFFSET_SRC_MAC, PC_MAC, 6))
     {
         printf(">>> This packet is from specific PC, routing to WAN\n");
-        //sendpacket
-        static pcap_t * device;
-        if(device == NULL)
+        if(wan_device == NULL)
         {
-            // TODO use global var for *device
-            // no need to open it twice
-            pcap_t * device = pcap_open_live(DEV_WAN, 65535, 1, 0, errBuf);
-            pcap_sendpacket(device, packet ,pkthdr->len);
+            // How could that happen?
+            printf("!!! ERROR: WAN Device is NULL!\n");
         }
         else
         {
-            pcap_sendpacket(device, packet ,pkthdr->len);
+            pcap_sendpacket(wan_device, packet ,pkthdr->len);
         }
     }
     //*****************************
@@ -63,17 +62,14 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     if (!memcmp(packet + OFFSET_DEST_MAC, PC_MAC, 6))
     {
         printf(">>> This packet is to specific PC, routing to LAN\n");
-        //sendpacket
-        static pcap_t * device;
-        if(device == NULL)
+        if(lan_device == NULL)
         {
-            pcap_t * device = pcap_open_live(DEV_LAN, 65535, 1, 0, errBuf);
-            pcap_sendpacket(device, packet ,pkthdr->len) ;
-            //pcap_close(device);
+            // How could that happen?
+            printf("!!! ERROR: LAN Device is NULL!\n");
         }
         else
         {
-            pcap_sendpacket(device, packet ,pkthdr->len) ;
+            pcap_sendpacket(lan_device, packet ,pkthdr->len) ;
         }
     }
 }
@@ -83,9 +79,9 @@ void *thread_lan ()//监听lan
     char errBuf[PCAP_ERRBUF_SIZE];
     int id = 0;
     /* get a device */
-    pcap_t * device = pcap_open_live(DEV_LAN, 65535, 1, 0, errBuf);
+    lan_device = pcap_open_live(DEV_LAN, 65535, 1, 0, errBuf);
 
-    if(!device)
+    if(!lan_device)
     {
         printf("error: pcap_open_live(): %s\n", errBuf);
         exit(1);
@@ -97,13 +93,13 @@ void *thread_lan ()//监听lan
 
     /* construct a filter */
     struct bpf_program filter;
-    pcap_compile(device, &filter, "ether proto 0x888E", 1, 0);
-    pcap_setfilter(device, &filter);
+    pcap_compile(lan_device, &filter, "ether proto 0x888E", 1, 0);
+    pcap_setfilter(lan_device, &filter);
 
     /* wait loop forever */
-    pcap_loop(device, -1, getPacket_lan, (u_char*)&id);  //使用回调 调用发包函数
+    pcap_loop(lan_device, -1, getPacket_lan, (u_char*)&id);  //使用回调 调用发包函数
 
-    pcap_close(device);
+    pcap_close(lan_device);
 
     return 0;
 }
@@ -114,9 +110,9 @@ void *thread_wan ()//监听wan
     char errBuf[PCAP_ERRBUF_SIZE];
     int id = 0;
     /* get a device */
-    pcap_t * device = pcap_open_live(DEV_WAN, 65535, 1, 0, errBuf);
+    wan_device = pcap_open_live(DEV_WAN, 65535, 1, 0, errBuf);
 
-    if(!device)
+    if(!wan_device)
     {
         printf("error: pcap_open_live(): %s\n", errBuf);
         exit(1);
@@ -128,13 +124,13 @@ void *thread_wan ()//监听wan
 
     /* construct a filter */
     struct bpf_program filter;
-    pcap_compile(device, &filter, "ether proto 0x888E", 1, 0);
-    pcap_setfilter(device, &filter);
+    pcap_compile(wan_device, &filter, "ether proto 0x888E", 1, 0);
+    pcap_setfilter(wan_device, &filter);
 
     /* wait loop forever */
-    pcap_loop(device, -1, getPacket_wan, (u_char*)&id);  //回调函数
+    pcap_loop(wan_device, -1, getPacket_wan, (u_char*)&id);  //回调函数
 
-    pcap_close(device);
+    pcap_close(wan_device);
 
     return 0;
 }

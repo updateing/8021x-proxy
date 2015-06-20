@@ -6,9 +6,13 @@
 #include <unistd.h>
 #include <string.h>
 
-#define DEV_LAN "eth0" //lan
-#define DEV_WAN "eth1" //wan
-#define PC_MAC packet[6]==0xbc && packet[7]==0x5f && packet[8]==0xf4 && packet[9]==0x92 && packet[10]==0xc7 && packet[11]==0x99
+#define DEV_LAN "eth0"
+#define DEV_WAN "eth1"
+#define OFFSET_SRC_MAC 6
+#define OFFSET_DEST_MAC 0
+
+u_char PC_MAC[] = {0x3c, 0x97, 0x0e, 0xa6, 0x62, 0x61};
+u_char ROUTER_MAC[] = {0x44, 0x94, 0xfc, 0x82, 0xd2, 0x93};
 
 void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
@@ -22,23 +26,23 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     printf("Received time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec));
 
     //*************lan2wan*****************
-    //if source from pc then packet it to WAN else drop it.
-    if (PC_MAC)
+    // If source MAC is PC's, send it to WAN
+    if (!memcmp(packet + OFFSET_SRC_MAC, PC_MAC, 6))
     {
-        printf("find pc_MAC yes! \n \n");
+        printf(">>> This packet is from specific PC, routing to WAN\n");
         //sendpacket
         static pcap_t * device;
         if(device == NULL)
         {
+            // TODO use global var for *device
+            // no need to open it twice
             pcap_t * device = pcap_open_live(DEV_WAN, 65535, 1, 0, errBuf);
             pcap_sendpacket(device, packet ,pkthdr->len);
         }
         else
         {
-            //printf("pcap_open_live(): %sn",errBuf); exit(1); //open error
             pcap_sendpacket(device, packet ,pkthdr->len);
         }
-        //pcap_close(device);
     }
     //*****************************
     printf("\n\n");
@@ -53,12 +57,12 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
     printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
-    printf("\n\n");
+
     //*************wan2lan*****************
-    //if source not from pc the packet it to LAN else drop it
-    if (!(PC_MAC))
+    // If destination MAC is specific PC, send it to LAN
+    if (!memcmp(packet + OFFSET_DEST_MAC, PC_MAC, 6))
     {
-        printf("Not find pc_MAC !  n n");
+        printf(">>> This packet is to specific PC, routing to LAN\n");
         //sendpacket
         static pcap_t * device;
         if(device == NULL)
@@ -76,7 +80,7 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
 
 void *thread_lan ()//监听lan
 {
-    char errBuf[PCAP_ERRBUF_SIZE];//, * devStr;
+    char errBuf[PCAP_ERRBUF_SIZE];
     int id = 0;
     /* get a device */
     pcap_t * device = pcap_open_live(DEV_LAN, 65535, 1, 0, errBuf);
@@ -88,7 +92,7 @@ void *thread_lan ()//监听lan
     }
     else
     {
-        printf("success: device: %s\n", DEV_LAN);
+        printf("success: using %s as LAN interface\n", DEV_LAN);
     }
 
     /* construct a filter */
@@ -107,7 +111,7 @@ void *thread_lan ()//监听lan
 void *thread_wan ()//监听wan
 {
     
-    char errBuf[PCAP_ERRBUF_SIZE];//, * devStr;
+    char errBuf[PCAP_ERRBUF_SIZE];
     int id = 0;
     /* get a device */
     pcap_t * device = pcap_open_live(DEV_WAN, 65535, 1, 0, errBuf);
@@ -119,7 +123,7 @@ void *thread_wan ()//监听wan
     }
     else
     {
-        printf("success: device: %s\n", DEV_WAN);
+        printf("success: using %s as WAN interface\n", DEV_WAN);
     }
 
     /* construct a filter */

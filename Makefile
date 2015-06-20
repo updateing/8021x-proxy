@@ -1,7 +1,7 @@
 # Build options
 DEBUG := true
 DEBUG_MOD_PACKET := true
-ENABLE_ALTERING_MAC := true # opt-out, two options above is opt-in
+DISABLE_ALTERING_MAC := false
 
 # Complier options
 BINARY_NAME := 8021xproxy
@@ -33,7 +33,7 @@ ifeq ($(DEBUG_MOD_PACKET), true)
     CFLAGS += -DDEBUG_MOD_PACKET
 endif
 
-ifneq ($(ENABLE_ALTERING_MAC), false)
+ifneq ($(DISABLE_ALTERING_MAC), true)
     CFLAGS += -DENABLE_ALTERING_MAC
 endif
 

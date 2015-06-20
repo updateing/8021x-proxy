@@ -7,6 +7,9 @@
 #include <string.h>
 
 #define ENABLE_ALTERING_MAC
+#define DEBUG
+#define DEBUG_MOD_PACKET
+
 #define DEV_LAN "eth0"
 #define DEV_WAN "eth1"
 #define OFFSET_SRC_MAC 6
@@ -18,7 +21,7 @@ u_char ROUTER_MAC[] = {0x44, 0x94, 0xfc, 0x82, 0xd2, 0x93};
 pcap_t * lan_device;
 pcap_t * wan_device;
 
-void print_hex(u_char * data, int len, int wrap_elements) {
+void print_hex(const u_char * data, int len, int wrap_elements) {
     int i;
     for(i = 0; i < len; ++i) {
         printf("%02x ", data[i]);
@@ -41,6 +44,10 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
     printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
+
+#ifdef DEBUG
+    print_hex(packet, pkthdr->len, 16);
+#endif
 
     //*************lan2wan*****************
     // If source MAC is PC's, send it to WAN
@@ -68,6 +75,10 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
                 memcpy(mod_packet + OFFSET_SRC_MAC, ROUTER_MAC, 6); // Overwrite source MAC with router's
                 printf(">>> Source MAC has been modified to router.\n");
             }
+#ifdef DEBUG_MOD_PACKET
+            printf(">>> Debug: modded packet is\n");
+            print_hex(mod_packet, pkthdr->len, 16);
+#endif
             pcap_sendpacket(wan_device, mod_packet, pkthdr->len);
 #else
             pcap_sendpacket(wan_device, packet, pkthdr->len);
@@ -90,6 +101,10 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
     printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
+
+#ifdef DEBUG
+    print_hex(packet, pkthdr->len, 16);
+#endif
 
     //*************wan2lan*****************
     // If destination MAC is specific PC, send it to LAN
@@ -120,6 +135,10 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
                 memcpy(mod_packet + OFFSET_DEST_MAC, PC_MAC, 6); // Overwrite source MAC with router's
                 printf(">>> Destination MAC has been modified to PC.\n");
             }
+#ifdef DEBUG_MOD_PACKET
+            printf(">>> Debug: modded packet is\n");
+            print_hex(mod_packet, pkthdr->len, 16);
+#endif
             pcap_sendpacket(lan_device, mod_packet, pkthdr->len);
 #else
             pcap_sendpacket(lan_device, packet, pkthdr->len);

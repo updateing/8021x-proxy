@@ -1,0 +1,4 @@
+8021x Proxy
+===========
+Based on https://code.google.com/p/mentohust/issues/detail?id=256
+This is used to get 8021x EAP authentication packets pass through the router.

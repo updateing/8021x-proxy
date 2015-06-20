@@ -6,10 +6,6 @@
 #include <unistd.h>
 #include <string.h>
 
-#define ENABLE_ALTERING_MAC
-#define DEBUG
-#define DEBUG_MOD_PACKET
-
 #define DEV_LAN "eth0"
 #define DEV_WAN "eth1"
 #define OFFSET_SRC_MAC 6

@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 
+#define ENABLE_ALTERING_MAC
 #define DEV_LAN "eth0"
 #define DEV_WAN "eth1"
 #define OFFSET_SRC_MAC 6
@@ -17,22 +18,39 @@ u_char ROUTER_MAC[] = {0x44, 0x94, 0xfc, 0x82, 0xd2, 0x93};
 pcap_t * lan_device;
 pcap_t * wan_device;
 
+void print_hex(u_char * data, int len, int wrap_elements) {
+    int i;
+    for(i = 0; i < len; ++i) {
+        printf("%02x ", data[i]);
+        if(!wrap_elements && (i + 1) % wrap_elements == 0 ) {
+            printf("\n");
+        }
+    }
+    if (!wrap_elements && len % wrap_elements != 0) printf("\n");
+}
+
 void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
     int * id = (int *)arg;
-    char errBuf[PCAP_ERRBUF_SIZE];
+#ifdef ENABLE_MAC_ALTERING
+    u_char * mod_packet;
+#endif
 
     printf("Thread 1 (LAN) CAPTURED:\n");
-    printf("ID: %d\n", ++(*id));
+    printf("Packet ID: %d\n", ++(*id));
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
-    printf("Received time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec));
+    printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
 
     //*************lan2wan*****************
     // If source MAC is PC's, send it to WAN
     if (!memcmp(packet + OFFSET_SRC_MAC, PC_MAC, 6))
     {
+#ifdef ENABLE_MAC_ALTERING
+        printf(">>> This packet is from specific PC, modifying source MAC and routing to WAN\n");
+#else
         printf(">>> This packet is from specific PC, routing to WAN\n");
+#endif
         if(wan_device == NULL)
         {
             // How could that happen?
@@ -40,7 +58,20 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
         }
         else
         {
-            pcap_sendpacket(wan_device, packet ,pkthdr->len);
+#ifdef ENABLE_MAC_ALTERING
+            mod_packet = malloc(pkthdr->len);
+            if (mod_packet == NULL) {
+                printf("!!! Error creating buffer for modified packet, dropping!\n");
+                return;
+            } else {
+                memcpy(mod_packet, packet, pkthdr->len);
+                memcpy(mod_packet + OFFSET_SRC_MAC, ROUTER_MAC, 6); // Overwrite source MAC with router's
+                printf(">>> Source MAC has been modified to router.\n");
+            }
+            pcap_sendpacket(wan_device, mod_packet, pkthdr->len);
+#else
+            pcap_sendpacket(wan_device, packet, pkthdr->len);
+#endif
         }
     }
     //*****************************
@@ -50,18 +81,28 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
 void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
     int * id = (int *)arg;
-    char errBuf[PCAP_ERRBUF_SIZE];
+#ifdef ENABLE_MAC_ALTERING
+    u_char * mod_packet;
+#endif
+
     printf("Thread 2 (WAN) CAPTURED:\n");
-    printf("ID: %d\n", ++(*id));
+    printf("Packet ID: %d\n", ++(*id));
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
     printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
 
     //*************wan2lan*****************
     // If destination MAC is specific PC, send it to LAN
+#ifdef ENABLE_MAC_ALTERING
+    if (!memcmp(packet + OFFSET_DEST_MAC, ROUTER_MAC, 6))
+    {
+        printf(">>> This packet is to router, modifying destination MAC and routing to LAN\n");
+#else
     if (!memcmp(packet + OFFSET_DEST_MAC, PC_MAC, 6))
     {
         printf(">>> This packet is to specific PC, routing to LAN\n");
+#endif
+
         if(lan_device == NULL)
         {
             // How could that happen?
@@ -69,7 +110,20 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
         }
         else
         {
-            pcap_sendpacket(lan_device, packet ,pkthdr->len) ;
+#ifdef ENABLE_MAC_ALTERING
+            mod_packet = malloc(pkthdr->len);
+            if (mod_packet == NULL) {
+                printf("!!! Error creating buffer for modified packet, dropping!\n");
+                return;
+            } else {
+                memcpy(mod_packet, packet, pkthdr->len);
+                memcpy(mod_packet + OFFSET_DEST_MAC, PC_MAC, 6); // Overwrite source MAC with router's
+                printf(">>> Destination MAC has been modified to PC.\n");
+            }
+            pcap_sendpacket(lan_device, mod_packet, pkthdr->len);
+#else
+            pcap_sendpacket(lan_device, packet, pkthdr->len);
+#endif
         }
     }
 }

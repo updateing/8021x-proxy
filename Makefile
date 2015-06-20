@@ -9,7 +9,7 @@ else
     REAL_CC := $(CC)
 endif
 
-8021xproxy:
+8021xproxy: $(SRC_FILES)
 	$(REAL_CC) $(SRC_FILES) -o $(BINARY_NAME) $(CFLAGS)
 
 .PHONY: clean

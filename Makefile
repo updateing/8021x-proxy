@@ -7,9 +7,9 @@ DISABLE_ALTERING_MAC := false
 BINARY_NAME := 8021xproxy
 SRC_FILES := 8021xproxy.c
 CFLAGS := -ldl -lpcap -lpthread -Wall
-CROSS_COMPILE_CC :=
-ADDITIONAL_INCLUDE_DIR :=
-ADDITIONAL_LIBS_DIR :=
+CROSS_COMPILE_CC := /media/hamster/Android/openwrt/OpenWrt-Toolchain-ar71xx-for-mips_r2-gcc-4.6-linaro_uClibc-0.9.33.2/toolchain-mips_r2_gcc-4.6-linaro_uClibc-0.9.33.2/bin/mips-openwrt-linux-gcc
+ADDITIONAL_INCLUDE_DIR := /media/hamster/Android/openwrt/8021xproxy
+ADDITIONAL_LIBS_DIR := /media/hamster/Android/openwrt/8021xproxy
 
 ifneq ($(CROSS_COMPILE_CC),)
     REAL_CC := $(CROSS_COMPILE_CC)
@@ -34,7 +34,7 @@ ifeq ($(DEBUG_MOD_PACKET), true)
 endif
 
 ifneq ($(DISABLE_ALTERING_MAC), true)
-    CFLAGS += -DENABLE_ALTERING_MAC
+    CFLAGS += -DENABLE_MAC_ALTERING
 endif
 
 8021xproxy: $(SRC_FILES)

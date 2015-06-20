@@ -6,7 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 
-#define DEV_LAN "eth0"
+#define DEV_LAN "eth0.1"
 #define DEV_WAN "eth1"
 #define OFFSET_SRC_MAC 6
 #define OFFSET_DEST_MAC 0
@@ -21,11 +21,11 @@ void print_hex(const u_char * data, int len, int wrap_elements) {
     int i;
     for(i = 0; i < len; ++i) {
         printf("%02x ", data[i]);
-        if(!wrap_elements && (i + 1) % wrap_elements == 0 ) {
+        if(wrap_elements && (i + 1) % wrap_elements == 0 ) {
             printf("\n");
         }
     }
-    if (!wrap_elements && len % wrap_elements != 0) printf("\n");
+    if (!wrap_elements || (wrap_elements && len % wrap_elements != 0)) printf("\n");
 }
 
 void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)

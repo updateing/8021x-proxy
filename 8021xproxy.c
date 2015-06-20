@@ -5,6 +5,7 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <string.h>
+
 #define DEV_LAN "eth0" //lan
 #define DEV_WAN "eth1" //wan
 #define PC_MAC packet[6]==0xbc && packet[7]==0x5f && packet[8]==0xf4 && packet[9]==0x92 && packet[10]==0xc7 && packet[11]==0x99
@@ -13,16 +14,12 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
 {
     int * id = (int *)arg;
     char errBuf[PCAP_ERRBUF_SIZE];
-    int d;
-    for(d=0;d<1000;d++);
-    printf("I am from thread1 \n");
-    printf("id: %d\n", ++(*id));
-    printf("Packet length: %d\n", pkthdr->len);
-    printf("Number of bytes: %d\n", pkthdr->caplen);
-    printf("Recieved time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec));
 
-    int i;
-    printf("\n\n");
+    printf("Thread 1 (LAN) CAPTURED:\n");
+    printf("ID: %d\n", ++(*id));
+    printf("Packet length on wire: %d\n", pkthdr->len);
+    printf("Number of bytes captured: %d\n", pkthdr->caplen);
+    printf("Received time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec));
 
     //*************lan2wan*****************
     //if source from pc then packet it to WAN else drop it.
@@ -51,15 +48,12 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
 {
     int * id = (int *)arg;
     char errBuf[PCAP_ERRBUF_SIZE];
-    printf("I am from thread2 \n");
-    printf("id: %d\n", ++(*id));
-    printf("Packet length: %d\n", pkthdr->len);
-    printf("Number of bytes: %d\n", pkthdr->caplen);
-    printf("Recieved time: %s", ctime((const time_t *)&pkthdr->ts.tv_sec));
-
-    int i;
-
-    printf("nn");
+    printf("Thread 2 (WAN) CAPTURED:\n");
+    printf("ID: %d\n", ++(*id));
+    printf("Packet length on wire: %d\n", pkthdr->len);
+    printf("Number of bytes captured: %d\n", pkthdr->caplen);
+    printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
+    printf("\n\n");
     //*************wan2lan*****************
     //if source not from pc the packet it to LAN else drop it
     if (!(PC_MAC))
@@ -85,8 +79,6 @@ void *thread_lan ()//监听lan
     char errBuf[PCAP_ERRBUF_SIZE];//, * devStr;
     int id = 0;
     /* get a device */
-    //devStr = pcap_lookupdev(errBuf);
-    //devStr=DEV_LAN;
     pcap_t * device = pcap_open_live(DEV_LAN, 65535, 1, 0, errBuf);
 
     if(!device)
@@ -118,8 +110,6 @@ void *thread_wan ()//监听wan
     char errBuf[PCAP_ERRBUF_SIZE];//, * devStr;
     int id = 0;
     /* get a device */
-    //devStr = pcap_lookupdev(errBuf);
-    //devStr=DEV_WAN;
     pcap_t * device = pcap_open_live(DEV_WAN, 65535, 1, 0, errBuf);
 
     if(!device)

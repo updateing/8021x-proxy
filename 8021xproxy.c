@@ -8,6 +8,7 @@
 #include <stdbool.h>
 
 #include "proxy_cmdline.h"
+#include "proxy_misc.h"
 
 #define OFFSET_SRC_MAC 6
 #define OFFSET_DEST_MAC 0
@@ -21,17 +22,6 @@ bool mac_alter = true;
 
 pcap_t * lan_device;
 pcap_t * wan_device;
-
-void print_hex(const u_char * data, int len, int wrap_elements) {
-    int i;
-    for(i = 0; i < len; ++i) {
-        printf("%02x ", data[i]);
-        if(wrap_elements && (i + 1) % wrap_elements == 0 ) {
-            printf("\n");
-        }
-    }
-    if (!wrap_elements || (wrap_elements && len % wrap_elements != 0)) printf("\n");
-}
 
 void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
@@ -54,6 +44,7 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     {
         // How could that happen?
         printf("!!! ERROR: WAN Device is NULL!\n");
+        return;
     }
     
     if (!memcmp(packet + OFFSET_SRC_MAC, PC_MAC, 6))
@@ -65,9 +56,9 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
                 printf("!!! Error creating buffer for modified packet, dropping!\n");
                 return;
             } else {
-               memcpy(mod_packet, packet, pkthdr->len);
-               memcpy(mod_packet + OFFSET_SRC_MAC, ROUTER_MAC, 6); // Overwrite source MAC with router's
-               printf(">>> Source MAC has been modified to router.\n");
+                memcpy(mod_packet, packet, pkthdr->len);
+                memcpy(mod_packet + OFFSET_SRC_MAC, ROUTER_MAC, 6); // Overwrite source MAC with router's
+                printf(">>> Source MAC has been modified to router.\n");
             }
 #ifdef DEBUG_MOD_PACKET
             printf(">>> Debug: modded packet is\n");
@@ -80,7 +71,7 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
         }
     }
     //*****************************
-    printf("\n\n");
+    printf("==========\n");
 }
 
 void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
@@ -133,6 +124,7 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
             pcap_sendpacket(lan_device, packet, pkthdr->len);
         }
     }
+    printf("==========\n");
 }
 
 void *thread_lan ()//监听lan

@@ -6,6 +6,10 @@
  */
 
 // hate "extern"
+
+#ifndef PROXY_CMDLINE_H
+#define PROXY_CMDLINE_H
+
 #include <stdbool.h>
 typedef unsigned char u_char;
 
@@ -17,3 +21,5 @@ bool get_mac_cloning_enabled();
 
 void print_header();
 void process_cmdline(int argc, char* argv[]);
+
+#endif

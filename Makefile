@@ -1,15 +1,14 @@
 # Build options
-DEBUG := true
-DEBUG_MOD_PACKET := true
-DISABLE_ALTERING_MAC := false
+DEBUG := false
+DEBUG_MOD_PACKET := false
 
 # Complier options
 BINARY_NAME := 8021xproxy
-SRC_FILES := 8021xproxy.c
-CFLAGS := -ldl -lpcap -lpthread -Wall
-CROSS_COMPILE_CC := /media/hamster/Android/openwrt/OpenWrt-Toolchain-ar71xx-for-mips_r2-gcc-4.6-linaro_uClibc-0.9.33.2/toolchain-mips_r2_gcc-4.6-linaro_uClibc-0.9.33.2/bin/mips-openwrt-linux-gcc
+SRC_FILES := 8021xproxy.c proxy_cmdline.c proxy_misc.c
+CFLAGS := -ldl -lpcap -lpthread -Wall -Wno-pointer-sign
+CROSS_COMPILE_CC := /media/hamster/Android/openwrt_my/OpenWrt-Toolchain-ar71xx-for-mips_34kc-gcc-4.8-linaro_uClibc-0.9.33.2/toolchain-mips_34kc_gcc-4.8-linaro_uClibc-0.9.33.2/bin/mips-openwrt-linux-gcc
 ADDITIONAL_INCLUDE_DIR := /media/hamster/Android/openwrt/8021xproxy
-ADDITIONAL_LIBS_DIR := /media/hamster/Android/openwrt/8021xproxy
+ADDITIONAL_LIBS_DIR := /media/hamster/Android/openwrt/build_dir/target-mips_34kc_uClibc-0.9.33.2/libpcap-1.5.3
 
 ifneq ($(CROSS_COMPILE_CC),)
     REAL_CC := $(CROSS_COMPILE_CC)
@@ -33,13 +32,9 @@ ifeq ($(DEBUG_MOD_PACKET), true)
     CFLAGS += -DDEBUG_MOD_PACKET
 endif
 
-ifneq ($(DISABLE_ALTERING_MAC), true)
-    CFLAGS += -DENABLE_MAC_ALTERING
-endif
-
 8021xproxy: $(SRC_FILES)
 	$(REAL_CC) $(SRC_FILES) -o $(BINARY_NAME) $(CFLAGS)
 
 .PHONY: clean
 clean:
-	rm 8021xproxy
+	rm -f 8021xproxy *.o

@@ -4,7 +4,7 @@ DEBUG_MOD_PACKET := false
 
 # Complier options
 BINARY_NAME := 8021xproxy
-SRC_FILES := 8021xproxy.c proxy_cmdline.c proxy_misc.c
+SRC_FILES := 8021xproxy.c proxy_cmdline.c proxy_misc.c eap_packet.c
 CFLAGS := -ldl -lpcap -lpthread -Wall -Wno-pointer-sign
 CROSS_COMPILE_CC := /media/hamster/Android/openwrt_my/OpenWrt-Toolchain-ar71xx-for-mips_34kc-gcc-4.8-linaro_uClibc-0.9.33.2/toolchain-mips_34kc_gcc-4.8-linaro_uClibc-0.9.33.2/bin/mips-openwrt-linux-gcc
 ADDITIONAL_INCLUDE_DIR := /media/hamster/Android/openwrt/8021xproxy

@@ -9,6 +9,7 @@
  
 #ifndef PROXY_CONST_H
 #define PROXY_CONST_H
+
 #define STRINGIFY(x) _STRINGIFY(x)
 #define _STRINGIFY(x) #x
 
@@ -25,5 +26,8 @@
  #define SPECIAL_THANKS "Special thanks to xxx\n"
  */
  
-#define MAX_INTERFACE_NAME_LENGTH 10
+#define MAX_STRING_PARAM_LENGTH 1024
+
+#define DEFAULT_REQUIRED_SUCCESS_COUNT 1
+
 #endif

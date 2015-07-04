@@ -18,6 +18,8 @@ u_char* get_wan_interface();
 u_char* get_client_mac();
 u_char* get_router_mac();
 bool get_mac_cloning_enabled();
+u_char* get_run_on_success_cmd();
+int get_required_success_count();
 
 void print_header();
 void process_cmdline(int argc, char* argv[]);

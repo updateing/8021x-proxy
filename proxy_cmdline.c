@@ -31,6 +31,10 @@ u_char router_mac[6]; // TODO: auto discover by device name
 u_char* lan_interface;
 u_char* wan_interface;
 
+/* Run this command when enough EAP Success'es is received */
+u_char* cmd_on_success;
+int required_success_count;
+
 /* MAC cloning enabled or not. Only get enabled when
  * -c is given
  * -n is NOT given
@@ -42,6 +46,8 @@ u_char* get_wan_interface() { return wan_interface; }
 u_char* get_client_mac() { return client_mac; }
 u_char* get_router_mac() { return router_mac; }
 bool get_mac_cloning_enabled() { return mac_cloning_enabled; }
+u_char* get_run_on_success_cmd() { return cmd_on_success; }
+int get_required_success_count() { return required_success_count; }
 
 void print_header() {
 	printf("802.1x Proxy v" STRINGIFY(VERSION) "\n");
@@ -70,6 +76,9 @@ static void print_help() {
 	printf("	-n --no-mac-cloning [OPTIONAL] DO NOT clone MAC even if -c is given. "
 		"By default MAC cloning is enabled when -c is given. "
 		"With this option, -c will act as a filter.\n");
+	printf("	-s --run-on-success COMMAND [OPTIONAL] Perform COMMAND on EAP Success.\n");
+	printf("	-t --count-of-success X [OPTIONAL] Wait for X EAP success packets "
+		"before performing shell command in -s. Default is 1.\n");
 }
 
 /* Converts xx:xx:xx:xx:xx:xx MAC address to 6 bytes */
@@ -87,23 +96,35 @@ static int process_mac_address(u_char mac_storage[], u_char* mac_string) {
 	return RESULT_OK;
 }
 
-static int process_interface(u_char** intf_storage, u_char* intf_string) {
+static int process_string(u_char** intf_storage, u_char* intf_string) {
 	// Silly bug here: u_char**
 	size_t len = strlen(intf_string);
 	if (*intf_storage != NULL)
 		free(*intf_storage);
-	*intf_storage = (char*) malloc(len > MAX_INTERFACE_NAME_LENGTH ?
-		MAX_INTERFACE_NAME_LENGTH : len);
+	*intf_storage = (char*) malloc(len > MAX_STRING_PARAM_LENGTH ?
+		MAX_STRING_PARAM_LENGTH : len);
+	// We have to use u_char** due to this malloc
+	// We need to change the original pointer
 	if (*intf_storage == NULL)
 		return RESULT_FAIL;
 	
-	strncpy(*intf_storage, intf_string, MAX_INTERFACE_NAME_LENGTH);
+	strncpy(*intf_storage, intf_string, MAX_STRING_PARAM_LENGTH);
 	return RESULT_OK;
+}
+
+static int process_int(int* int_storage, u_char* int_str) {
+	int scan_count = 0;
+	scan_count = sscanf(int_str, "%d", int_storage);
+	return scan_count ? RESULT_OK : RESULT_FAIL;
 }
 
 static void clean_vars() {
 	memset(client_mac, 0 ,6);
-	memset(router_mac, 0, 6);	
+	memset(router_mac, 0, 6);
+	wan_interface = NULL;
+	lan_interface = NULL;
+	cmd_on_success = NULL;
+	required_success_count = DEFAULT_REQUIRED_SUCCESS_COUNT;
 }
 
 static void dump_params() {
@@ -148,7 +169,7 @@ void process_cmdline(int argc, char* argv[]) {
 				exit(EINVAL);
 			}
 		} else if (!strcmp(argv[i], "-w") || !strcmp(argv[i], "--wan-interface")) {
-			if (i + 1 < argc && process_interface(&wan_interface, argv[i + 1]) == RESULT_OK) {
+			if (i + 1 < argc && process_string(&wan_interface, argv[i + 1]) == RESULT_OK) {
 				wan_intf_set = true;
 				i++;
 			} else {
@@ -156,7 +177,7 @@ void process_cmdline(int argc, char* argv[]) {
 				exit(EINVAL);
 			}
 		} else if (!strcmp(argv[i], "-l") || !strcmp(argv[i], "--lan-interface")) {
-			if (i + 1 < argc && process_interface(&lan_interface, argv[i + 1]) == RESULT_OK) {
+			if (i + 1 < argc && process_string(&lan_interface, argv[i + 1]) == RESULT_OK) {
 				lan_intf_set = true;
 				i++;
 			} else {
@@ -165,6 +186,20 @@ void process_cmdline(int argc, char* argv[]) {
 			}
 		} else if (!strcmp(argv[i], "-n") || !strcmp(argv[i], "--no-mac-cloning")) {
 			mac_clone_force_off = true; // Postpone until loop is finished.
+		} else if (!strcmp(argv[i], "-s") || !strcmp(argv[i], "--run-on-success")) {
+			if (i + 1 < argc && process_string(&cmd_on_success, argv[i + 1]) == RESULT_OK) {
+				i++;
+			} else {
+				fprintf(stderr, "Run-on-success command is wrong\n");
+				exit(EINVAL);
+			}
+		} else if (!strcmp(argv[i], "-t") || !strcmp(argv[i], "--count-of-success")) {
+			if (i + 1 < argc && process_int(&required_success_count, argv[i + 1]) == RESULT_OK) {
+				i++;
+			} else {
+				fprintf(stderr, "Count of success is wrong. Please enter an decimal integer\n");
+				exit(EINVAL);
+			}
 		}
 	}
 	
@@ -179,8 +214,9 @@ void process_cmdline(int argc, char* argv[]) {
 	if (!router_mac_set && mac_cloning_enabled
 		&& get_mac_address(router_mac, wan_interface)) {
 		// No WAN MAC, user ask to clone MAC, MAC auto-discover failed
-		fprintf(stderr, "Router MAC address auto-discover failed. "
-			"Cannot clone MAC address, exiting.\n");
+		fprintf(stderr, "Router MAC address auto-discover failed "
+			"while cloning MAC address is enabled, exiting. "
+			"Please specific MAC address for WAN\n");
 		exit(EIO);
 	}
 	

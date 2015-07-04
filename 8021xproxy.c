@@ -9,35 +9,57 @@
 
 #include "proxy_cmdline.h"
 #include "proxy_misc.h"
+#include "proxy_const.h"
+#include "eap_packet.h"
 
 #define OFFSET_SRC_MAC 6
 #define OFFSET_DEST_MAC 0
 
-/* These four are set in main() */
+/* These are set in main() */
 u_char* DEV_LAN;
 u_char* DEV_WAN;
+u_char* run_on_success_cmd;
 u_char PC_MAC[6];
 u_char ROUTER_MAC[6];
 bool mac_alter = true;
+int success_count_req;
 
 pcap_t * lan_device;
 pcap_t * wan_device;
+
+/* Set & read in WAN thread */
+int current_success_count = 0;
+
+void do_run_on_success_cmd() {
+    if (run_on_success_cmd != NULL) {
+        current_success_count++;
+        if (current_success_count >= success_count_req) {
+            printf(">>> Ready to run shell command: %s\n", run_on_success_cmd);
+            system(run_on_success_cmd);
+            current_success_count = 0;
+        }
+    }
+}
 
 void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
 {
     int * id = (int *)arg;
     u_char * mod_packet;
 
+    printf("==========\n");
     printf("Thread 1 (LAN) CAPTURED:\n");
     printf("Packet ID: %d\n", ++(*id));
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
     printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
-
+    if (load_packet(packet, pkthdr->len) == RESULT_FAIL)
+        fprintf(stderr, "!!! load_packet() failed. Trigger won't work.\n");
+    
 #ifdef DEBUG
     print_hex(packet, pkthdr->len, 16);
 #endif
-
+    dump_packet_eap_info();
+    
     //*************lan2wan*****************
     // If source MAC is PC's, send it to WAN
     if(wan_device == NULL)
@@ -58,7 +80,6 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
             } else {
                 memcpy(mod_packet, packet, pkthdr->len);
                 memcpy(mod_packet + OFFSET_SRC_MAC, ROUTER_MAC, 6); // Overwrite source MAC with router's
-                printf(">>> Source MAC has been modified to router.\n");
             }
 #ifdef DEBUG_MOD_PACKET
             printf(">>> Debug: modded packet is\n");
@@ -70,8 +91,6 @@ void getPacket_lan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
             pcap_sendpacket(wan_device, packet, pkthdr->len);
         }
     }
-    //*****************************
-    printf("==========\n");
 }
 
 void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char * packet)
@@ -79,16 +98,20 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
     int * id = (int *)arg;
     u_char * mod_packet;
 
+    printf("==========\n");
     printf("Thread 2 (WAN) CAPTURED:\n");
     printf("Packet ID: %d\n", ++(*id));
     printf("Packet length on wire: %d\n", pkthdr->len);
     printf("Number of bytes captured: %d\n", pkthdr->caplen);
     printf("Received time: %s\n", ctime((const time_t *)&pkthdr->ts.tv_sec));
-
+    if (load_packet(packet, pkthdr->len) == RESULT_FAIL)
+        fprintf(stderr, "!!! load_packet() failed. Trigger won't work.\n");
+    
 #ifdef DEBUG
     print_hex(packet, pkthdr->len, 16);
 #endif
-
+    dump_packet_eap_info();
+    
     //*************wan2lan*****************
     // If destination MAC is specific PC, send it to LAN
     if(lan_device == NULL)
@@ -109,7 +132,6 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
             } else {
                 memcpy(mod_packet, packet, pkthdr->len);
                 memcpy(mod_packet + OFFSET_DEST_MAC, PC_MAC, 6); // Overwrite source MAC with router's
-                printf(">>> Destination MAC has been modified to PC.\n");
             }
 #ifdef DEBUG_MOD_PACKET
             printf(">>> Debug: modded packet is\n");
@@ -124,7 +146,9 @@ void getPacket_wan(u_char * arg, const struct pcap_pkthdr * pkthdr, const u_char
             pcap_sendpacket(lan_device, packet, pkthdr->len);
         }
     }
-    printf("==========\n");
+    
+    if (get_packet_eap_code() == EAP_SUCCESS)
+        do_run_on_success_cmd();
 }
 
 void *thread_lan ()//监听lan
@@ -209,6 +233,9 @@ int main(int argc, char* argv[])
     memcpy(PC_MAC, get_client_mac(), 6);
     
     mac_alter = get_mac_cloning_enabled();
+    
+    run_on_success_cmd = get_run_on_success_cmd();
+    success_count_req = get_required_success_count();
     
     start_proxy();
     return 0;
